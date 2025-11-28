@@ -1,0 +1,42 @@
+[
+  {
+    "path": "/",
+    "type": "page",
+    "serverOrClient": "client",
+    "dataSources": [],
+    "gatedBy": []
+  },
+  {
+    "path": "/login",
+    "type": "page",
+    "serverOrClient": "client",
+    "dataSources": [],
+    "gatedBy": []
+  },
+  {
+    "path": "/connect",
+    "type": "page",
+    "serverOrClient": "client",
+    "dataSources": ["api:POST /accounts"],
+    "gatedBy": []
+  },
+  {
+    "path": "/dashboard",
+    "type": "page",
+    "serverOrClient": "client",
+    "dataSources": [
+      "api:GET /dashboard/summary",
+      "api:GET /dashboard/open-trades",
+      "api:GET /dashboard/equity-series",
+      "api:GET /dashboard/closed-trades"
+    ],
+    "gatedBy": []
+  },
+  {
+    "path": "/post-checkout",
+    "type": "page",
+    "serverOrClient": "server",
+    "dataSources": [],
+    "gatedBy": []
+  }
+]
