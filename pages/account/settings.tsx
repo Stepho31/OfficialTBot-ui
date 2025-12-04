@@ -92,7 +92,25 @@ export default function UserSettingsPage() {
 
   return (
     <main style={{ maxWidth: 720, margin: '60px auto', fontFamily: 'Inter, system-ui, Arial' }}>
-      <h2>Trade Settings</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h2 style={{ margin: 0 }}>Trade Settings</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="button-outline"
+            onClick={() => router.push('/account/broker')}
+            style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+          >
+            Broker Settings
+          </button>
+          <button
+            className="button-outline"
+            onClick={() => router.push('/dashboard')}
+            style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+          >
+            Dashboard
+          </button>
+        </div>
+      </div>
       <p style={{ marginTop: 8, color: 'var(--subtle)' }}>
         Control how much of your account balance the bot allocates per trade position.
       </p>

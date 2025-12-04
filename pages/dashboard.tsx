@@ -297,7 +297,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* RIGHT SIDE: upgrade buttons + logout */}
+          {/* RIGHT SIDE: upgrade buttons + settings + logout */}
           <div className="hstack" style={{ gap: 12, alignItems: 'center' }}>
             {(!canReceiveSignals && !isAdmin) && (
               <button className="button-outline" onClick={() => handleTierCheckout('TIER1')}>
@@ -308,6 +308,26 @@ export default function Dashboard() {
               <button className="button" onClick={() => handleTierCheckout('TIER2')}>
                 Automate My Trading
               </button>
+            )}
+
+            {/* Settings links - show if user can trade or is admin */}
+            {(canTrade || isAdmin) && (
+              <div className="hstack" style={{ gap: 8, marginLeft: 8, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
+                <button
+                  className="button-outline"
+                  onClick={() => router.push('/account/settings')}
+                  style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+                >
+                  Trade Settings
+                </button>
+                <button
+                  className="button-outline"
+                  onClick={() => router.push('/account/broker')}
+                  style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+                >
+                  Broker
+                </button>
+              </div>
             )}
 
             {jwt && (

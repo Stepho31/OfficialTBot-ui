@@ -102,7 +102,25 @@ export default function BrokerSettings() {
 
   return (
     <main style={{ maxWidth: 720, margin: '60px auto', fontFamily: 'Inter, system-ui, Arial' }}>
-      <h2>Broker Settings</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h2 style={{ margin: 0 }}>Broker Settings</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="button-outline"
+            onClick={() => router.push('/account/settings')}
+            style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+          >
+            Trade Settings
+          </button>
+          <button
+            className="button-outline"
+            onClick={() => router.push('/dashboard')}
+            style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+          >
+            Dashboard
+          </button>
+        </div>
+      </div>
       <p style={{ marginTop: 8 }}>
         Connect your OANDA account so the automation agent can trade on your behalf.
       </p>
