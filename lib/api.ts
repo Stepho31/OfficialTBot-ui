@@ -143,7 +143,7 @@ export async function register(
   if (oandaAccountId) body.oanda_account_id = oandaAccountId;
   if (oandaApiKey) body.oanda_api_key = oandaApiKey;
 
-  const r = await fetch(`${API_BASE}/auth/register`, {
+  const r = await fetch(`${API_BASE}/v1/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -156,11 +156,11 @@ export async function register(
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const r = await fetch(`${API_BASE}/auth/login`, {
+  const r = await fetch(`${API_BASE}/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
-  });
+  });  
   if (r.status === 401) {
     throw new Error("Invalid email or password");
   }
