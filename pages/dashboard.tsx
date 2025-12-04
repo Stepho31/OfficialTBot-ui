@@ -310,8 +310,8 @@ export default function Dashboard() {
               </button>
             )}
 
-            {/* Settings links - show if user can trade or is admin */}
-            {(canTrade || isAdmin) && (
+            {/* Settings links - show for all Tier 2 users (canAccessDashboard) or admins */}
+            {(canAccessDashboard || isAdmin) && (
               <div className="hstack" style={{ gap: 8, marginLeft: 8, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
                 <button
                   className="button-outline"
