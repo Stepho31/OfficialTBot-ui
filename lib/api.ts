@@ -201,3 +201,21 @@ export async function resetPassword(token: string, newPassword: string): Promise
   }
   return r.json();
 }
+
+export type UserSettings = {
+  trade_allocation: number;
+};
+
+export async function getUserSettings(jwt?: string): Promise<UserSettings> {
+  return fetchJSON("/user/settings", jwt, { method: "GET" });
+}
+
+export async function updateUserSettings(
+  payload: { trade_allocation?: number },
+  jwt?: string
+): Promise<UserSettings> {
+  return fetchJSON("/user/settings", jwt, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
