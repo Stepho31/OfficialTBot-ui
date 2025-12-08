@@ -113,6 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('autopip_jwt', token);
     }
+
+    // Immediately update auth context state with the JWT
+    setState((prev) => ({ ...prev, jwt: token }));
+
+    // Then refresh user, subscription, and entitlement data
     refresh();
   }, [refresh]);
 

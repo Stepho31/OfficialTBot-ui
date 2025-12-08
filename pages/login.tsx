@@ -25,23 +25,40 @@ export default function Login() {
       
       // If user can access dashboard, redirect there
       if (response.can_access_dashboard) {
+        setLoading(false);
         router.push('/dashboard');
       } else {
         // Otherwise, redirect to checkout
-        await startCheckout('TIER1');
-      }
-    } catch (err: any) {
-      if (err?.status === 402 || err?.message === 'PAYMENT_REQUIRED') {
-        // User needs to pay, redirect to checkout
+        setLoading(false);
         try {
           await startCheckout('TIER1');
-        } catch (checkoutErr) {
+        } catch (checkoutErr: any) {
           setError('Payment required. Please complete checkout to access the dashboard.');
           setLoading(false);
         }
+      }
+    } catch (err: any) {
+      setLoading(false);
+      if (err?.status === 402 || err?.message === 'PAYMENT_REQUIRED' || err?.message?.includes('PAYMENT_REQUIRED')) {
+        // User needs to pay, redirect to checkout
+        try {
+          await startCheckout('TIER1');
+        } catch (checkoutErr: any) {
+          setError('Payment required. Please complete checkout to access the dashboard.');
+        }
       } else {
-        setError(err?.message || 'Login failed');
-        setLoading(false);
+        // Extract error message more reliably
+        let errorMessage = 'Login failed. Please check your email and password.';
+        if (err?.message) {
+          errorMessage = err.message;
+        } else if (typeof err === 'string') {
+          errorMessage = err;
+        } else if (err?.response?.data?.detail) {
+          errorMessage = err.response.data.detail;
+        } else if (err?.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        }
+        setError(errorMessage);
       }
     }
   };

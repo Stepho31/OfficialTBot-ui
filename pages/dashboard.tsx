@@ -1,22 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
-import { getAccountSummary, getPerformanceSummary, getTrades, startCheckout } from '../lib/api';
+import { getAccountSummary, getPerformanceSummary, getTrades, startCheckout, getPrimaryAccount, getDashboardOpenTrades, getDashboardTrades, getDashboardEquitySeries } from '../lib/api';
 import { useAuthData } from '../lib/auth-context';
 
 const EquityChart = dynamic(() => import('../components/EquityChart'), { ssr: false });
 
 type TradeRow = {
-  id: string;
-  instrument: string;
-  side: string;
-  size: number;
+  id?: string;
+  trade_id?: string | null;
+  instrument?: string | null;
+  side?: string | null;
+  size?: number | null;
+  units?: number | null;
   entry?: number | null;
+  entry_price?: number | null;
   exit?: number | null;
+  exit_price?: number | null;
   pnl?: number | null;
-  status: string;
+  pnl_net?: number | null;
+  unrealized_pnl?: number | null;
+  status?: string | null;
   openedAt?: string | null;
+  opened_at?: string | null;
   closedAt?: string | null;
+  closed_at?: string | null;
 };
 
 type PerformanceSummary = {
@@ -39,6 +47,8 @@ export default function Dashboard() {
   const router = useRouter();
   const { loading: authLoading, error: authError, entitlements, subscription, me, jwt, canAccessDashboard, logout } = useAuthData();
   const [trades, setTrades] = useState<TradeRow[]>([]);
+  const [openTrades, setOpenTrades] = useState<TradeRow[]>([]);
+  const [recentTrades, setRecentTrades] = useState<TradeRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingTrades, setLoadingTrades] = useState(false);
   const [tradesError, setTradesError] = useState<string | null>(null);
@@ -48,6 +58,55 @@ export default function Dashboard() {
   const [accountSummary, setAccountSummary] = useState<AccountSummary | null>(null);
   const [accountSummaryError, setAccountSummaryError] = useState<string | null>(null);
   const [loadingAccountSummary, setLoadingAccountSummary] = useState(false);
+  const [primaryAccountId, setPrimaryAccountId] = useState<number | null>(null);
+  const [loadingAccountId, setLoadingAccountId] = useState(false);
+
+  const loadPrimaryAccount = useCallback(async () => {
+    if (!jwt) return;
+    setLoadingAccountId(true);
+    try {
+      const account = await getPrimaryAccount(jwt);
+      setPrimaryAccountId(account.account_id);
+    } catch (err: any) {
+      console.error('Failed to load primary account:', err);
+      // Fallback: try to load trades without account_id (using /v1/trades)
+      setPrimaryAccountId(null);
+    } finally {
+      setLoadingAccountId(false);
+    }
+  }, [jwt]);
+
+  const loadOpenTrades = useCallback(async () => {
+    if (!jwt || !primaryAccountId) return;
+    try {
+      const trades = await getDashboardOpenTrades(primaryAccountId, jwt);
+      setOpenTrades(trades as TradeRow[]);
+    } catch (err: any) {
+      console.error('Failed to load open trades:', err);
+      setTradesError(err?.message || 'Failed to load open trades');
+    }
+  }, [jwt, primaryAccountId]);
+
+  const loadRecentTrades = useCallback(async () => {
+    if (!jwt || !primaryAccountId) return;
+    try {
+      const trades = await getDashboardTrades(primaryAccountId, undefined, undefined, jwt);
+      setRecentTrades(trades as TradeRow[]);
+    } catch (err: any) {
+      console.error('Failed to load recent trades:', err);
+      setTradesError(err?.message || 'Failed to load recent trades');
+    }
+  }, [jwt, primaryAccountId]);
+
+  const loadEquitySeries = useCallback(async () => {
+    if (!jwt || !primaryAccountId) return;
+    try {
+      const series = await getDashboardEquitySeries(primaryAccountId, '30d', jwt);
+      setEquitySeries(series as { taken_at: string; equity: number | null }[]);
+    } catch (err: any) {
+      console.error('Failed to load equity series:', err);
+    }
+  }, [jwt, primaryAccountId]);
 
   const loadTrades = useCallback(
     async (cursor?: string) => {
@@ -107,28 +166,81 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (authLoading || !jwt) return;
-    loadTrades();
+    loadPrimaryAccount();
     loadPerformance();
     loadAccountSummary();
-  }, [authLoading, jwt, loadTrades, loadPerformance, loadAccountSummary]);
+    // Fallback: load trades from /v1/trades if account_id not available
+    loadTrades();
+  }, [authLoading, jwt, loadPrimaryAccount, loadPerformance, loadAccountSummary, loadTrades]);
 
   useEffect(() => {
-    if (!performance) return;
-    if (!performance.periodStart || !performance.periodEnd) return;
-    setEquitySeries([
-      { taken_at: performance.periodStart, equity: null },
-      { taken_at: performance.periodEnd, equity: performance.totalPnL },
-    ]);
-  }, [performance]);
+    if (primaryAccountId && jwt) {
+      loadOpenTrades();
+      loadRecentTrades();
+      loadEquitySeries();
+    }
+  }, [primaryAccountId, jwt, loadOpenTrades, loadRecentTrades, loadEquitySeries]);
 
-  const openTrades = useMemo(
-    () => trades.filter((t) => (t.status || '').toUpperCase() === 'OPEN'),
-    [trades]
-  );
-  const closedTrades = useMemo(
-    () => trades.filter((t) => (t.status || '').toUpperCase() !== 'OPEN'),
-    [trades]
-  );
+  // Fallback: use trades from /v1/trades if dashboard endpoints not available
+  const openTradesDisplay = useMemo(() => {
+    if (openTrades.length > 0) {
+      return openTrades.map(t => ({
+        id: t.trade_id || t.id || '',
+        instrument: t.instrument || '',
+        side: t.side || '',
+        size: t.units || t.size || 0,
+        entry: t.entry_price || t.entry || null,
+        exit: t.exit_price || t.exit || null,
+        pnl: t.unrealized_pnl || t.pnl_net || t.pnl || null,
+        status: t.status || 'OPEN',
+        openedAt: t.opened_at || t.openedAt || null,
+        closedAt: t.closed_at || t.closedAt || null,
+      }));
+    }
+    // Fallback to filtered trades
+    return trades.filter((t) => (t.status || '').toUpperCase() === 'OPEN').map(t => ({
+      id: t.id || t.trade_id || '',
+      instrument: t.instrument || '',
+      side: t.side || '',
+      size: t.size || t.units || 0,
+      entry: t.entry || t.entry_price || null,
+      exit: t.exit || t.exit_price || null,
+      pnl: t.pnl || t.pnl_net || null,
+      status: t.status || 'OPEN',
+      openedAt: t.openedAt || t.opened_at || null,
+      closedAt: t.closedAt || t.closed_at || null,
+    }));
+  }, [openTrades, trades]);
+
+  const closedTradesDisplay = useMemo(() => {
+    if (recentTrades.length > 0) {
+      return recentTrades.map(t => ({
+        id: t.trade_id || t.id || '',
+        instrument: t.instrument || '',
+        side: t.side || '',
+        size: t.units || t.size || 0,
+        entry: t.entry_price || t.entry || null,
+        exit: t.exit_price || t.exit || null,
+        pnl: t.pnl_net || t.pnl || null,
+        status: t.status || 'CLOSED',
+        openedAt: t.opened_at || t.openedAt || null,
+        closedAt: t.closed_at || t.closedAt || null,
+      }));
+    }
+    // Fallback to filtered trades
+    return trades.filter((t) => (t.status || '').toUpperCase() !== 'OPEN').map(t => ({
+      id: t.id || t.trade_id || '',
+      instrument: t.instrument || '',
+      side: t.side || '',
+      size: t.size || t.units || 0,
+      entry: t.entry || t.entry_price || null,
+      exit: t.exit || t.exit_price || null,
+      pnl: t.pnl || t.pnl_net || null,
+      status: t.status || 'CLOSED',
+      openedAt: t.openedAt || t.opened_at || null,
+      closedAt: t.closedAt || t.closed_at || null,
+    }));
+  }, [recentTrades, trades]);
 
   const isAdmin = (me?.role || '').toUpperCase() === 'ADMIN';
   const canTrade = (entitlements?.canTrade ?? false) || isAdmin;
@@ -432,7 +544,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {openTrades.map((t) => (
+                  {openTradesDisplay.map((t) => (
                     <tr key={t.id}>
                       <td>{t.openedAt ? new Date(t.openedAt).toLocaleString() : '—'}</td>
                       <td>{t.instrument}</td>
@@ -446,7 +558,7 @@ export default function Dashboard() {
                       <td>{t.entry ?? '—'}</td>
                     </tr>
                   ))}
-                  {openTrades.length === 0 && (
+                  {openTradesDisplay.length === 0 && (
                     <tr>
                       <td colSpan={5} className="subtle">
                         No open trades.
@@ -474,7 +586,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {closedTrades.map((t) => (
+                  {closedTradesDisplay.map((t) => (
                     <tr key={t.id}>
                       <td>{t.closedAt ? new Date(t.closedAt).toLocaleString() : '—'}</td>
                       <td>{t.instrument}</td>
@@ -483,11 +595,11 @@ export default function Dashboard() {
                       <td>{t.entry ?? '—'}</td>
                       <td>{t.exit ?? '—'}</td>
                       <td style={{ color: (t.pnl ?? 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                        {t.pnl ?? '—'}
+                        {t.pnl?.toFixed(2) ?? '—'}
                       </td>
                     </tr>
                   ))}
-                  {closedTrades.length === 0 && (
+                  {closedTradesDisplay.length === 0 && (
                     <tr>
                       <td colSpan={7} className="subtle">
                         No past trades yet.

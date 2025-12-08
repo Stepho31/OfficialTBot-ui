@@ -11,18 +11,62 @@ export function authHeaders(jwt?: string): Record<string, string> {
 }
 
 async function fetchJSON(path: string, jwt?: string, init: RequestInit = {}) {
-  const opts: RequestInit = {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers || {}),
-      ...authHeaders(jwt),
-    },
-  };
-  const res = await fetch(`${API_BASE}${path}`, opts);
-  if (res.status === 401) throw new Error("unauthorized");
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  try {
+    const opts: RequestInit = {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers || {}),
+        ...authHeaders(jwt),
+      },
+    };
+    const res = await fetch(`${API_BASE}${path}`, opts);
+    
+    if (res.status === 401) {
+      const error = new Error("unauthorized") as Error & { status: number };
+      error.status = 401;
+      throw error;
+    }
+    
+    if (res.status === 402) {
+      const error = new Error("PAYMENT_REQUIRED") as Error & { status: number };
+      error.status = 402;
+      throw error;
+    }
+    
+    if (!res.ok) {
+      let errorMessage = `Request failed: ${res.status}`;
+      try {
+        const text = await res.text();
+        if (text) {
+          try {
+            const json = JSON.parse(text);
+            errorMessage = json.detail || json.message || text;
+          } catch {
+            errorMessage = text;
+          }
+        }
+      } catch {
+        // If we can't read the response, use the default message
+      }
+      const error = new Error(errorMessage) as Error & { status: number };
+      error.status = res.status;
+      throw error;
+    }
+    
+    return res.json();
+  } catch (err: any) {
+    // Re-throw if it's already an Error with status
+    if (err?.status) {
+      throw err;
+    }
+    // Handle network errors
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      throw new Error("Network error. Please check your connection and try again.");
+    }
+    // Re-throw other errors
+    throw err;
+  }
 }
 
 export async function getMe(jwt?: string) {
@@ -69,6 +113,25 @@ export async function getPerformanceSummary(jwt?: string) {
 
 export async function getAccountSummary(jwt?: string) {
   return fetchJSON("/v1/account/summary", jwt, { method: "GET" });
+}
+
+export async function getPrimaryAccount(jwt?: string) {
+  return fetchJSON("/accounts/primary", jwt, { method: "GET" });
+}
+
+export async function getDashboardOpenTrades(accountId: number, jwt?: string) {
+  return fetchJSON(`/dashboard/open-trades?account_id=${accountId}`, jwt, { method: "GET" });
+}
+
+export async function getDashboardTrades(accountId: number, fromDt?: string, toDt?: string, jwt?: string) {
+  const params = new URLSearchParams({ account_id: String(accountId) });
+  if (fromDt) params.set("from_dt", fromDt);
+  if (toDt) params.set("to_dt", toDt);
+  return fetchJSON(`/dashboard/trades?${params.toString()}`, jwt, { method: "GET" });
+}
+
+export async function getDashboardEquitySeries(accountId: number, window: string = "30d", jwt?: string) {
+  return fetchJSON(`/dashboard/equity-series?account_id=${accountId}&window=${window}`, jwt, { method: "GET" });
 }
 
 export async function connectOanda(
@@ -156,24 +219,74 @@ export async function register(
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const r = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });  
-  if (r.status === 401) {
-    throw new Error("Invalid email or password");
+  const loginUrl = `${API_BASE}/auth/login`;
+  
+  try {
+    const r = await fetch(loginUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });  
+    
+    if (r.status === 401) {
+      const error = new Error("Invalid email or password") as Error & { status: number };
+      error.status = 401;
+      throw error;
+    }
+    
+    if (r.status === 402) {
+      const error = new Error("PAYMENT_REQUIRED") as Error & { status: number };
+      error.status = 402;
+      throw error;
+    }
+    
+    if (r.status === 404) {
+      const error = new Error(`Login endpoint not found. Please check that the API server is running at ${API_BASE}`) as Error & { status: number };
+      error.status = 404;
+      throw error;
+    }
+    
+    if (!r.ok) {
+      let errorMessage = `Login failed: ${r.status}`;
+      try {
+        const text = await r.text();
+        if (text) {
+          // Try to parse as JSON first
+          try {
+            const json = JSON.parse(text);
+            errorMessage = json.detail || json.message || text;
+          } catch {
+            errorMessage = text;
+          }
+        }
+      } catch {
+        // If we can't read the response, use the default message
+      }
+      const error = new Error(errorMessage) as Error & { status: number };
+      error.status = r.status;
+      throw error;
+    }
+    
+    const data = await r.json();
+    
+    // Validate response structure
+    if (!data.access_token) {
+      throw new Error("Invalid response from server: missing access token");
+    }
+    
+    return data;
+  } catch (err: any) {
+    // Re-throw if it's already an Error with status
+    if (err?.status) {
+      throw err;
+    }
+    // Handle network errors
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      throw new Error(`Network error connecting to ${API_BASE}. Please check your connection and that the API server is running.`);
+    }
+    // Re-throw other errors
+    throw err;
   }
-  if (r.status === 402) {
-    const error = new Error("PAYMENT_REQUIRED") as Error & { status: number };
-    error.status = 402;
-    throw error;
-  }
-  if (!r.ok) {
-    const text = await r.text();
-    throw new Error(text || `Login failed: ${r.status}`);
-  }
-  return r.json();
 }
 
 export async function forgotPassword(email: string): Promise<{ message: string }> {
