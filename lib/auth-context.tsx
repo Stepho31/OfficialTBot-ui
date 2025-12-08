@@ -59,6 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const token = readJwt();
+    // Immediately set jwt in state if token exists, even before API calls
+    if (token) {
+      setState((prev) => ({ ...prev, jwt: token }));
+    }
+    
     if (!token) {
       setState({
         loading: false,

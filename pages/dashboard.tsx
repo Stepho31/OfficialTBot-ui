@@ -62,10 +62,12 @@ export default function Dashboard() {
   const [loadingAccountId, setLoadingAccountId] = useState(false);
 
   const loadPrimaryAccount = useCallback(async () => {
-    if (!jwt) return;
+    // Fallback to localStorage if context jwt is not ready yet
+    const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+    if (!token) return;
     setLoadingAccountId(true);
     try {
-      const account = await getPrimaryAccount(jwt);
+      const account = await getPrimaryAccount(token);
       setPrimaryAccountId(account.account_id);
     } catch (err: any) {
       console.error('Failed to load primary account:', err);
@@ -77,9 +79,11 @@ export default function Dashboard() {
   }, [jwt]);
 
   const loadOpenTrades = useCallback(async () => {
-    if (!jwt || !primaryAccountId) return;
+    // Fallback to localStorage if context jwt is not ready yet
+    const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+    if (!token || !primaryAccountId) return;
     try {
-      const trades = await getDashboardOpenTrades(primaryAccountId, jwt);
+      const trades = await getDashboardOpenTrades(primaryAccountId, token);
       setOpenTrades(trades as TradeRow[]);
     } catch (err: any) {
       console.error('Failed to load open trades:', err);
@@ -88,9 +92,11 @@ export default function Dashboard() {
   }, [jwt, primaryAccountId]);
 
   const loadRecentTrades = useCallback(async () => {
-    if (!jwt || !primaryAccountId) return;
+    // Fallback to localStorage if context jwt is not ready yet
+    const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+    if (!token || !primaryAccountId) return;
     try {
-      const trades = await getDashboardTrades(primaryAccountId, undefined, undefined, jwt);
+      const trades = await getDashboardTrades(primaryAccountId, undefined, undefined, token);
       setRecentTrades(trades as TradeRow[]);
     } catch (err: any) {
       console.error('Failed to load recent trades:', err);
@@ -99,9 +105,11 @@ export default function Dashboard() {
   }, [jwt, primaryAccountId]);
 
   const loadEquitySeries = useCallback(async () => {
-    if (!jwt || !primaryAccountId) return;
+    // Fallback to localStorage if context jwt is not ready yet
+    const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+    if (!token || !primaryAccountId) return;
     try {
-      const series = await getDashboardEquitySeries(primaryAccountId, '30d', jwt);
+      const series = await getDashboardEquitySeries(primaryAccountId, '30d', token);
       setEquitySeries(series as { taken_at: string; equity: number | null }[]);
     } catch (err: any) {
       console.error('Failed to load equity series:', err);
@@ -110,11 +118,13 @@ export default function Dashboard() {
 
   const loadTrades = useCallback(
     async (cursor?: string) => {
-      if (!jwt) return;
+      // Fallback to localStorage if context jwt is not ready yet
+      const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+      if (!token) return;
       setLoadingTrades(true);
       setTradesError(null);
       try {
-        const res = await getTrades({ cursor, limit: 25 }, jwt);
+        const res = await getTrades({ cursor, limit: 25 }, token);
         const items = (res.items || []) as TradeRow[];
         setTrades((prev) => (cursor ? [...prev, ...items] : items));
         setNextCursor(res.nextCursor || null);
@@ -128,9 +138,11 @@ export default function Dashboard() {
   );
 
   const loadPerformance = useCallback(async () => {
-    if (!jwt) return;
+    // Fallback to localStorage if context jwt is not ready yet
+    const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+    if (!token) return;
     try {
-      const summary = await getPerformanceSummary(jwt);
+      const summary = await getPerformanceSummary(token);
       setPerformance(summary);
     } catch (err: any) {
       setPerformanceError(err?.message || 'Failed to load performance');
@@ -138,11 +150,13 @@ export default function Dashboard() {
   }, [jwt]);
 
   const loadAccountSummary = useCallback(async () => {
-    if (!jwt) return;
+    // Fallback to localStorage if context jwt is not ready yet
+    const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+    if (!token) return;
     setLoadingAccountSummary(true);
     setAccountSummaryError(null);
     try {
-      const summary = await getAccountSummary(jwt);
+      const summary = await getAccountSummary(token);
       setAccountSummary(summary);
     } catch (err: any) {
       // Handle different error cases gracefully
@@ -165,7 +179,11 @@ export default function Dashboard() {
   }, [jwt]);
 
   useEffect(() => {
-    if (authLoading || !jwt) return;
+    // Ensure we have a valid token before making any API calls
+    // Fallback to localStorage if context jwt is not ready yet (race condition fix)
+    const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+    if (authLoading || !token) return;
+    
     loadPrimaryAccount();
     loadPerformance();
     loadAccountSummary();
