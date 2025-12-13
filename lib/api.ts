@@ -383,7 +383,7 @@ export async function deleteVideo(videoId: string, jwt?: string): Promise<void> 
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...authHeaders(token),
+      ...authHeaders(token ?? undefined),
     },
   });
   if (!res.ok) {
