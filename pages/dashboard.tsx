@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { getAccountSummary, getPerformanceSummary, getTrades, startCheckout, getPrimaryAccount, getDashboardOpenTrades, getDashboardTrades, getDashboardEquitySeries } from '../lib/api';
 import { useAuthData } from '../lib/auth-context';
+import Tabs from '../components/Tabs';
+import LearningTab from '../components/LearningTab';
 
 const EquityChart = dynamic(() => import('../components/EquityChart'), { ssr: false });
 
@@ -60,6 +62,7 @@ export default function Dashboard() {
   const [loadingAccountSummary, setLoadingAccountSummary] = useState(false);
   const [primaryAccountId, setPrimaryAccountId] = useState<number | null>(null);
   const [loadingAccountId, setLoadingAccountId] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('trading');
 
   const loadPrimaryAccount = useCallback(async () => {
     // Fallback to localStorage if context jwt is not ready yet
@@ -398,80 +401,8 @@ export default function Dashboard() {
     );
   }
 
-  return (
-    <main className="container" style={{ display: 'grid', gap: 24 }}>
-      <header className="card" style={{ padding: 24 }}>
-        <div className="hstack" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ marginBottom: 8 }}>
-              <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 'bold', background: 'linear-gradient(135deg, #5b8cff 0%, #8b5cf6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', display: 'inline-block' }}>
-                Autopip AI
-              </h1>
-              <span style={{ marginLeft: 12, fontSize: '1.25rem', color: 'var(--muted)' }}>Trading Dashboard</span>
-            </div>
-            <div className="hstack" style={{ gap: 8, alignItems: 'center' }}>
-              <p className="subtle" style={{ marginTop: 4 }}>
-                Plan: <strong>{planLabel}</strong>
-              </p>
-              {isAdmin && (
-                <span className="badge info">
-                  <span className="dot" />
-                  Admin
-                </span>
-              )}
-            </div>
-            {subscription?.currentPeriodEnd && (
-              <p className="subtle">
-                Renews on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
-              </p>
-            )}
-          </div>
-
-          {/* RIGHT SIDE: upgrade buttons + settings + logout */}
-          <div className="hstack" style={{ gap: 12, alignItems: 'center' }}>
-            {(!canReceiveSignals && !isAdmin) && (
-              <button className="button-outline" onClick={() => handleTierCheckout('TIER1')}>
-                Get Signals Forever
-              </button>
-            )}
-            {(!canTrade && !isAdmin) && (
-              <button className="button" onClick={() => handleTierCheckout('TIER2')}>
-                Automate My Trading
-              </button>
-            )}
-
-            {/* Settings links - show for all Tier 2 users (canAccessDashboard) or admins */}
-            {(canAccessDashboard || isAdmin) && (
-              <div className="hstack" style={{ gap: 8, marginLeft: 8, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
-                <button
-                  className="button-outline"
-                  onClick={() => router.push('/account/settings')}
-                  style={{ fontSize: '0.9rem', padding: '8px 12px' }}
-                >
-                  Trade Settings
-                </button>
-                <button
-                  className="button-outline"
-                  onClick={() => router.push('/account/broker')}
-                  style={{ fontSize: '0.9rem', padding: '8px 12px' }}
-                >
-                  Broker
-                </button>
-              </div>
-            )}
-
-            {jwt && (
-              <button
-                className="button-outline"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
+  const tradingTabContent = (
+    <div style={{ display: 'grid', gap: 24 }}>
       {/* Account Balance Card */}
       <section className="card" style={{ padding: 24 }}>
         <div className="card-title" style={{ marginBottom: 12 }}>Account Balance</div>
@@ -652,6 +583,97 @@ export default function Dashboard() {
           </button>
         </section>
       )}
+    </div>
+  );
+
+  const tabs = [
+    {
+      id: 'trading',
+      label: 'Trading',
+      content: tradingTabContent,
+    },
+    {
+      id: 'learning',
+      label: 'Learning',
+      content: <LearningTab jwt={jwt} />,
+    },
+  ];
+
+  return (
+    <main className="container" style={{ display: 'grid', gap: 24 }}>
+      <header className="card" style={{ padding: 24 }}>
+        <div className="hstack" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ marginBottom: 8 }}>
+              <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 'bold', background: 'linear-gradient(135deg, #5b8cff 0%, #8b5cf6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', display: 'inline-block' }}>
+                Autopip AI
+              </h1>
+              <span style={{ marginLeft: 12, fontSize: '1.25rem', color: 'var(--muted)' }}>Trading Dashboard</span>
+            </div>
+            <div className="hstack" style={{ gap: 8, alignItems: 'center' }}>
+              <p className="subtle" style={{ marginTop: 4 }}>
+                Plan: <strong>{planLabel}</strong>
+              </p>
+              {isAdmin && (
+                <span className="badge info">
+                  <span className="dot" />
+                  Admin
+                </span>
+              )}
+            </div>
+            {subscription?.currentPeriodEnd && (
+              <p className="subtle">
+                Renews on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+
+          {/* RIGHT SIDE: upgrade buttons + settings + logout */}
+          <div className="hstack" style={{ gap: 12, alignItems: 'center' }}>
+            {(!canReceiveSignals && !isAdmin) && (
+              <button className="button-outline" onClick={() => handleTierCheckout('TIER1')}>
+                Get Signals Forever
+              </button>
+            )}
+            {(!canTrade && !isAdmin) && (
+              <button className="button" onClick={() => handleTierCheckout('TIER2')}>
+                Automate My Trading
+              </button>
+            )}
+
+            {/* Settings links - show for all Tier 2 users (canAccessDashboard) or admins */}
+            {(canAccessDashboard || isAdmin) && (
+              <div className="hstack" style={{ gap: 8, marginLeft: 8, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
+                <button
+                  className="button-outline"
+                  onClick={() => router.push('/account/settings')}
+                  style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+                >
+                  Trade Settings
+                </button>
+                <button
+                  className="button-outline"
+                  onClick={() => router.push('/account/broker')}
+                  style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+                >
+                  Broker
+                </button>
+              </div>
+            )}
+
+            {jwt && (
+              <button
+                className="button-outline"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
     </main>
   );
 }

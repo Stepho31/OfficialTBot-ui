@@ -1,3 +1,5 @@
+import { safeJsonParse } from './rsc-security';
+
 const DEFAULT_API = "https://officialtbot-api.onrender.com";
 
 export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API).replace(/\/$/, "");
@@ -40,10 +42,12 @@ async function fetchJSON(path: string, jwt?: string, init: RequestInit = {}) {
         const text = await res.text();
         if (text) {
           try {
-            const json = JSON.parse(text);
+            // Use safe JSON parsing to prevent DoS attacks
+            const json = safeJsonParse(text, 64 * 1024); // 64KB max for error responses
             errorMessage = json.detail || json.message || text;
           } catch {
-            errorMessage = text;
+            // If parsing fails, use text as-is (may be plain text error)
+            errorMessage = text.substring(0, 500); // Limit error message length
           }
         }
       } catch {
@@ -251,12 +255,13 @@ export async function login(email: string, password: string): Promise<AuthRespon
       try {
         const text = await r.text();
         if (text) {
-          // Try to parse as JSON first
+          // Try to parse as JSON first using safe parsing
           try {
-            const json = JSON.parse(text);
+            const json = safeJsonParse(text, 64 * 1024); // 64KB max for error responses
             errorMessage = json.detail || json.message || text;
           } catch {
-            errorMessage = text;
+            // If parsing fails, use text as-is (may be plain text error)
+            errorMessage = text.substring(0, 500); // Limit error message length
           }
         }
       } catch {
@@ -331,4 +336,68 @@ export async function updateUserSettings(
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+}
+
+// Video/Education API functions
+export type Video = {
+  id: string;
+  title: string;
+  youtube_url: string;
+  description?: string;
+  created_at: string;
+  updated_at?: string;
+};
+
+export async function uploadVideo(
+  payload: { title: string; youtube_url: string; description?: string },
+  jwt?: string
+): Promise<Video> {
+  return fetchJSON("/v1/videos", jwt, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getVideos(jwt?: string): Promise<Video[]> {
+  return fetchJSON("/v1/videos", jwt, { method: "GET" });
+}
+
+export async function getVideoById(videoId: string, jwt?: string): Promise<Video> {
+  return fetchJSON(`/v1/videos/${videoId}`, jwt, { method: "GET" });
+}
+
+export async function updateVideo(
+  videoId: string,
+  payload: { title?: string; youtube_url?: string; description?: string },
+  jwt?: string
+): Promise<Video> {
+  return fetchJSON(`/v1/videos/${videoId}`, jwt, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteVideo(videoId: string, jwt?: string): Promise<void> {
+  const token = jwt || (typeof window !== 'undefined' ? localStorage.getItem('autopip_jwt') : null);
+  const res = await fetch(`${API_BASE}/v1/videos/${videoId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || "Failed to delete video");
+  }
+  // DELETE may return empty body, which is fine
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return;
+  }
+  // Try to parse JSON if there's content
+  try {
+    await res.json();
+  } catch {
+    // Empty response is fine
+  }
 }
