@@ -25,7 +25,8 @@ setInterval(() => {
 function getClientId(request: NextRequest): string {
   // Use IP address or forwarded IP
   const forwarded = request.headers.get('x-forwarded-for');
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown';
+  const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
+
   return ip;
 }
 
